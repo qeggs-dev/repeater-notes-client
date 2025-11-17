@@ -131,7 +131,10 @@ class NoteCore:
             if response is None:
                 logger.error("Request failed")
             else:
-                await self.save_note(response = response)
+                await self.save_note(
+                    response = response,
+                    reference_context_user_id = reference_context_user_id
+                )
         
         timer = Timer(create_note)
         await timer.start(run_once_first = True)
