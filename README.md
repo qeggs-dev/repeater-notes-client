@@ -39,7 +39,7 @@
 
 ## 使用到的后端接口
 | 请求 | URL | 使用到的参数 | 描述 |
-| :---: | :---: | :---: | :---: | :---: |
+| :---: | :---: | :---: | :---: |
 | `POST` | `/chat/completion/{user_id:str}` | `message`, `reference_context_id`, `save_context` | 获取AI生成内容 |
 | `GET` | `/userdata/context/userlist` | | 获取Context类型的用户列表 |
 
