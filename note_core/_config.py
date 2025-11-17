@@ -1,9 +1,14 @@
 from pydantic import BaseModel, Field
-from enum import Enum
+from enum import StrEnum
 
-class Agreement(Enum):
+class Agreement(StrEnum):
     HTTP = "http"
     HTTPS = "https"
+
+class OutputFormat(StrEnum):
+    TEXT = "text"
+    JSON = "json"
+    YAML = "yaml"
 
 class ServerConfig(BaseModel):
     host: str = '127.0.0.1'
@@ -18,5 +23,6 @@ class Config(BaseModel):
     prompt_file: str = "./prompt/default.txt"
     output_dir: str = "./output"
     output_file_suffix: str = ".md"
+    output_format: OutputFormat = OutputFormat.TEXT
     retry_times: int = 3
     retry_interval: float = 0.5
