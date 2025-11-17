@@ -55,6 +55,10 @@ async def main():
             )
         
         await asyncio.gather(*pool)
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received. Exiting...")
+        for task in asyncio.all_tasks():
+            task.cancel()
     except Exception as e:
         logger.exception("An error occurred: {error}", error = e)
         
