@@ -1,0 +1,31 @@
+{
+    "title": "Repeater Notes Plugins Starter",
+    "console_title": "Repeater Notes Plugins",
+    "process_title": "Repeater Notes Plugins",
+    "exit_title": "Repeater Notes Plugins Starter",
+    "python_name": {
+        "windows": "python",
+        "default": "python3"
+    },
+    "pip_name": {
+        "windows": "pip",
+        "default": "pip3"
+    },
+    "requirements":[
+        {"name": "aiofiles"},
+        {"name": "loguru"},
+        {"name": "httpx"},
+        {"name": "pyyaml"},
+        {"name": "orjson"},
+        {"name": "pydantic"}
+    ],
+    "use_venv": true,
+    "venv_prompt": "Repeater Notes Plugins",
+    "script_name": null,
+    "argument": null,
+    "restart": false,
+    "run_cmd_need_to_ask": false,
+    "run_cmd_ask_default_values": {},
+    "divider_line_char": "=",
+    "automatic_exit": true
+}

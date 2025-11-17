@@ -1,0 +1,6 @@
+aiofiles
+loguru
+httpx
+pyyaml
+orjson
+pydantic
