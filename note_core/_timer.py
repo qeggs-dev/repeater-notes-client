@@ -41,7 +41,7 @@ class Timer:
 
             await asyncio.sleep(sleep_seconds)
     
-    async def _start(self, run_once_first: bool = False):
+    async def _start(self):
         while True:
             next_time = self.get_next_random_time()
             sleep_duration = next_time - datetime.datetime.now()
