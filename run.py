@@ -3,7 +3,7 @@ from __future__ import annotations
 # Python Simple Launcher For Virtual Environment Scripts
 # Sloves Starter !!!
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"
 
 # region Imports
 import re
@@ -14,6 +14,7 @@ import json
 import shlex
 import atexit
 import platform
+import traceback
 import subprocess
 from enum import Enum
 from pathlib import Path
@@ -33,7 +34,7 @@ from typing import (
 # region Constants
 SYSTEM: str = platform.system()
 
-T_CPV = TypeVar('T_CPV')
+T_CPV = TypeVar("T_CPV")
 
 class ExitCode(Enum):
     ONLY_PAUSE = None
@@ -49,6 +50,7 @@ class ExitCode(Enum):
     SCRIPT_NAME_IS_EMPTY = 9
     SCRIPT_NAME_NOT_PROVIDED = 10
     USER_TERMINATED = 11
+    CONFIG_PARSING_ERROR = 12
 
     UNKNOWN_ERROR = 255
 # endregion
@@ -85,8 +87,8 @@ def center_print(text: str, file: TextIO = sys.stdout):
 
 # region IsVenv
 def is_venv():
-    return hasattr(sys, 'real_prefix') or (
-        hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix
+    return hasattr(sys, "real_prefix") or (
+        hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
     )
 # endregion
 
@@ -322,14 +324,14 @@ class PipPackage:
         if not cls.PACKAGE_NAME_CHARSET.match(name):
             raise ValueError(f"Package name {name} contains invalid characters")
         
-        if name[0] in ['-', '_', '.'] or name[-1] in ['-', '_', '.']:
+        if name[0] in ["-", "_", "."] or name[-1] in ["-", "_", "."]:
             raise ValueError(f"Package name {name} cannot start or end with a special character")
         
         if cls.CONSECUTIVE_SPECIAL_CHARACTERS.search(name):
             raise ValueError(f"Package name {name} contains consecutive special characters")
         
         normalized = name.lower()
-        normalized = cls.SPECIAL_CHARACTER_REPLACEMENT.sub('_', normalized)
+        normalized = cls.SPECIAL_CHARACTER_REPLACEMENT.sub("_", normalized)
         
         return normalized
     
@@ -398,6 +400,9 @@ class PipInstaller:
 
 # region  Ask
 # region > BaseAsk
+
+# The purpose of this base class is to have a uniform base class for all four ASK classes
+# To facilitate follow-up to do type judgments
 class BaseAsk(ABC):
     """
     Interface for asking questions
@@ -412,7 +417,7 @@ class BaseAsk(ABC):
 # endregion
 
 # region >> Ask
-T_FILE = TypeVar('T_FILE', bound=TextIO)
+T_FILE = TypeVar("T_FILE", bound=TextIO)
 
 class Ask(BaseAsk, Generic[T_FILE]):
     """Ask for user"""
@@ -465,7 +470,7 @@ class Ask(BaseAsk, Generic[T_FILE]):
 # endregion
 
 # region > Choose 
-T = TypeVar('T')
+T = TypeVar("T")
 
 class Choose(BaseAsk, Generic[T, T_FILE]):
     """Ask the user to choose from a list of values"""
@@ -591,47 +596,62 @@ class FindFile(BaseAsk, Generic[T_FILE]):
 # endregion
 # endregion
 
-# region FormatTimeDuration
-def format_time_duration(duration: int, start_with: int = 0, use_abbreviation: bool = False, delimiter: str = ", ") -> str:
+# region FormatTimeLevels
+TIME_LEVELS: list[tuple[str, str, int]] = [
+    ("nanosecond", "ns", 1000),
+    ("microsecond", "μs", 1000),
+    ("millisecond", "ms", 1000),
+    ("second", "s", 60),
+    ("minute", "min", 60),
+    ("hour", "h", 24),
+    ("day", "day", 30),
+    ("month", "mon", 12),
+    ("year", "y", 100),
+]
+# endregion
+
+# region FormatCarryDuration
+def format_carry_duration(
+    value: int,
+    levels: list[tuple[str, str, int]],
+    start_with: int = 0,
+    use_abbreviation: bool = False,
+    delimiter: str = ", ",
+    final_level: tuple[str, str] = ("max_level", "max"),
+    negative_prompt: str = "(Negative) "
+) -> str:
     """
-    Format time duration in nanoseconds to a human-readable string.
+    Format a value using a carry system with specified levels.
 
     Args:
-        duration (int): Time duration in nanoseconds.
-        start_with (int, optional): The minimum level required for the selection when you want to format, 
-                                  the range is [0,9). Defaults to 0.
-        use_abbreviation (bool, optional): Whether to use abbreviations for time units. Defaults to False.
+        value (int): The value to format.
+        levels (list[tuple[str, str, int]]): List of (name, abbreviation, divisor) tuples.
+        start_with (int, optional): The starting index in levels. Defaults to 0.
+        use_abbreviation (bool, optional): Whether to use abbreviations. Defaults to False.
+        delimiter (str, optional): Delimiter between units. Defaults to ", ".
+        final_level (tuple[str, str], optional): Final level (name, abbreviation). Defaults to ("max_level", "max").
 
     Returns:
-        str: Formatted time duration string.
+        str: Formatted value string.
     """
-    if start_with not in range(0, 10):
-        raise ValueError("start_with must be in range [0, 9)")
+    if not levels:
+        raise ValueError("levels cannot be empty")
     
-    # Handle zero duration
-    if duration == 0:
-        return "0 ns" if use_abbreviation else "0 nanoseconds"
+    if start_with not in range(len(levels)):
+        raise ValueError(f"start_with must be in range [0, {len(levels)})")
     
-    # Handle negative duration
-    is_negative = duration < 0
-    duration = abs(duration)
+    # Handle zero value
+    if value == 0:
+        name, abbr = levels[0][:2] if levels else ("unit", "unit")
+        return f"0 {abbr if use_abbreviation else name}"
     
-    levels: list[tuple[str, str, int]] = [
-        ("nanosecond", "ns", 1000),
-        ("microsecond", "μs", 1000),
-        ("millisecond", "ms", 1000),
-        ("second", "s", 60),
-        ("minute", "min", 60),
-        ("hour", "h", 24),
-        ("day", "day", 30),
-        ("month", "mon", 12),
-        ("year", "y", 100),
-    ]
-    end_level: str = "century"
-    end_level_abbreviation: str = "cent"
+    # Handle negative value
+    is_negative = value < 0
+    value = abs(value)
     
+    end_level, end_level_abbreviation = final_level
     data_level_stack: list[str] = []
-    remaining_part: int = duration
+    remaining_part: int = value
     
     # Process each level starting from the specified level
     for name, abbreviation, divisor in levels[start_with:]:
@@ -651,7 +671,7 @@ def format_time_duration(duration: int, start_with: int = 0, use_abbreviation: b
         if remaining_part == 0:
             break
     
-    # Handle the final level (century)
+    # Handle the final level
     if remaining_part > 0:
         unit = end_level_abbreviation if use_abbreviation else end_level
         if remaining_part != 1 and not use_abbreviation:
@@ -662,7 +682,7 @@ def format_time_duration(duration: int, start_with: int = 0, use_abbreviation: b
     text = delimiter.join(data_level_stack[::-1])
     
     if is_negative:
-        text = f"(Negative) {text}"
+        text = f"{negative_prompt}{text}"
     
     return text
 # endregion
@@ -702,7 +722,7 @@ class SlovesStarter:
         self.restart:bool = False
         self.reselect: bool = False
         self.run_cmd_need_to_ask: bool = True
-        self.run_cmd_ask_default_values: dict[str, bool] = {}
+        self.ask_default_values: dict[str, bool] = {}
         self.divider_line_char: str = "="
         self.inject_environment_variables: dict[str, str] = os.environ.copy()
         self.text_encoding:str = "utf-8"
@@ -714,7 +734,7 @@ class SlovesStarter:
         set_title(self.title)
 
         try:
-            self.parse_config(self.load_config())
+            config = self.load_config()
         except FileNotFoundError:
             suffix:int = 0
             while True:
@@ -735,6 +755,12 @@ class SlovesStarter:
                     suffix += 1
             print("Continuing to run the program will operate with the default configuration...")
             self.pause_program(ExitCode.ONLY_PAUSE)
+        
+        try:
+            self.parse_config(config)
+        except Exception as e:
+            print(f"Error parsing config: {e}")
+            self.pause_program(ExitCode.CONFIG_PARSING_ERROR)
         
         @atexit.register
         def exit_handler():
@@ -897,9 +923,9 @@ class SlovesStarter:
         if exists_and_is_designated_type("run_cmd_need_to_ask", bool):
             self.run_cmd_need_to_ask = config["run_cmd_need_to_ask"]
         
-        if exists_and_is_designated_type("run_cmd_ask_default_values", dict):
-            if check_all_dict_types(config["run_cmd_ask_default_values"], str, bool):
-                self.run_cmd_ask_default_values = config["run_cmd_ask_default_values"]
+        if exists_and_is_designated_type("ask_default_values", dict):
+            if check_all_dict_types(config["ask_default_values"], str, bool):
+                self.ask_default_values = config["ask_default_values"]
         
         if exists_and_is_designated_type("divider_line_char", str):
             if len(config["divider_line_char"]) == 1:
@@ -952,7 +978,7 @@ class SlovesStarter:
             "restart": self.restart,
             "reselect": self.reselect,
             "run_cmd_need_to_ask": self.run_cmd_need_to_ask,
-            "run_cmd_ask_default_values": self.run_cmd_ask_default_values,
+            "ask_default_values": self.ask_default_values,
             "divider_line_char": self.divider_line_char,
             "inject_environment_variables": self.inject_environment_variables,
             "text_encoding": self.text_encoding,
@@ -1018,7 +1044,7 @@ class SlovesStarter:
             default: bool = True,
             print_return_code: bool = True,
             print_runtime: bool = True,
-            runtime_handler: Callable[[int, int], str] = lambda start, end: format_time_duration(end - start, use_abbreviation=True),
+            runtime_handler: Callable[[int, int], str] = lambda start, end: format_carry_duration(end - start, use_abbreviation=True, levels=TIME_LEVELS, final_level=("century", "cent")),
             env: dict[str, str] | None = None,
             askfile: TextIO = sys.stdout,
             capture_output: bool = False,
@@ -1039,7 +1065,7 @@ class SlovesStarter:
             askfile.write(reason + "\n")
             askfile.flush()
         run = self.ask(
-            id = "run_cmd",
+            id = "Run Cmd",
             prompt = f"Running:\n{shlex.join(cmd)}\nwith cwd: \"{cwd}\"\nRun this command?",
             default = default,
             askfile = askfile
@@ -1115,12 +1141,12 @@ class SlovesStarter:
             askfile.flush()
         
         if self.run_cmd_need_to_ask:
-            if id in self.run_cmd_ask_default_values:
+            if id in self.ask_default_values:
                 automatic_skip_prompt_print()
-                return self.run_cmd_ask_default_values[id]
-            elif prompt in self.run_cmd_ask_default_values:
+                return self.ask_default_values[id]
+            elif prompt in self.ask_default_values:
                 automatic_skip_prompt_print()
-                return self.run_cmd_ask_default_values[prompt]
+                return self.ask_default_values[prompt]
             else:
                 return Ask(prompt, default=default, file=askfile).ask()
         else:
@@ -1222,7 +1248,7 @@ class SlovesStarter:
             self.pause_program(ExitCode.SCRIPT_NAME_NOT_PROVIDED)
         
         if not Path(script_name).exists():
-            print(f"Error: Script '{script_name}' is not existing")
+            print(f"Error: Script \"{script_name}\" is not existing")
         
         if self.use_venv:
             if SYSTEM == "Windows":
@@ -1302,7 +1328,12 @@ class SlovesStarter:
                 set_title(self.process_exit_title)
             
             if self.restart:
-                if Ask("Re-select?").ask():
+                if self.reselect:
+                    ask = Ask("Re-select?")
+                else:
+                    ask = Ask("Restart?")
+                
+                if ask.ask():
                     reselect = False
                     continue
                 else:
@@ -1319,14 +1350,20 @@ class SlovesStarter:
 
 # region Start
 if __name__ == "__main__":
+    # This is supposed to be read from the inside
+    # However, it is possible to have undefined variables here
+    # So we've chosen to use the method of external variable + internal value override
+    text_encoding = "utf-8"
     try:
         starter = SlovesStarter()
+        text_coding = starter.text_encoding
         starter.main()
     except KeyboardInterrupt:
         print("Program terminated by user.")
         exit(ExitCode.USER_TERMINATED)
     except Exception as e:
-        import traceback
+        with open("Traceback.txt", "w", encoding=text_encoding) as f:
+            f.write(traceback.format_exc())
         traceback.print_exc()
         SlovesStarter.pause_program(ExitCode.UNKNOWN_ERROR)
 # endregion
