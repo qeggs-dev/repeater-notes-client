@@ -60,6 +60,7 @@ class NoteCore:
                         "message": self._prompt,
                         "reference_context_id": reference_context_user_id,
                         "save_context": False,
+                        "user_info": self._config.user_info.model_dump(exclude_none = True),
                     },
                     timeout = self._config.server.timeout,
                 )
