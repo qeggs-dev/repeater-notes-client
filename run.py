@@ -1334,8 +1334,10 @@ class SlovesStarter:
                     ask = Ask("Restart?")
                 
                 if ask.ask():
-                    reselect = False
-                    continue
+                    if self.reselect:
+                        reselect = True
+                    else:
+                        reselect = False
                 else:
                     break
             else:
