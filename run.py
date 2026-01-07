@@ -68,7 +68,7 @@ def set_title(title: str):
             # Win API
             ctypes.windll.kernel32.SetConsoleTitleW(title)
         except Exception:
-            os.system(f'title "{title}"')
+            os.system(f"title \"{title}\"")
     else:
         sys.stdout.write(f"\033]2;{title}\007")
         sys.stdout.flush()
@@ -851,7 +851,7 @@ class SlovesStarter:
                 print(prompt or "Press Ctrl+C to continue.")
             else:
                 if isinstance(code, ExitCode):
-                    print(prompt or f"Press Ctrl+C to Exit with code {code.value}{f'({code.name})'}.")
+                    print(prompt or f"Press Ctrl+C to Exit with code {code.value}({code.name}).")
                 else:
                     print(prompt or f"Press Ctrl+C to Exit with code {code}.")
         if wait:
