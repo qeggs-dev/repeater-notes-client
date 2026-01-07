@@ -16,7 +16,7 @@ import atexit
 import platform
 import traceback
 import subprocess
-from enum import Enum
+from enum import IntEnum, StrEnum
 from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import (
@@ -36,8 +36,8 @@ SYSTEM: str = platform.system()
 
 T_CPV = TypeVar("T_CPV")
 
-class ExitCode(Enum):
-    ONLY_PAUSE = None
+class ExitCode(IntEnum):
+    ONLY_PAUSE = -1
     SUCCESS = 0
     CONFIG_NOT_FOUND = 1
     CONFIG_DECODE_ERROR = 2
@@ -241,161 +241,6 @@ def absolute_path(path: str | Path, cwd: str | Path = None) -> Path:
     if path.is_absolute():
         return path
     return cwd.absolute() / path
-# endregion
-
-# region VersionChar
-class VersionChar(Enum):
-    eq = "=="
-    ne = "!="
-    gt = ">"
-    ge = ">="
-    lt = "<"
-    le = "<="
-# endregion
-
-# region PipPackage
-class PipPackage:
-    PACKAGE_NAME_CHARSET = re.compile(r"^[a-zA-Z0-9\-_.]+$")
-    CONSECUTIVE_SPECIAL_CHARACTERS = re.compile(r"--|__|\.\.")
-    SPECIAL_CHARACTER_REPLACEMENT = re.compile(r"[.-]")
-    def __init__(self, name: str, version_mode: VersionChar | str | None = None, version: str | None = None):
-        self._name: str = self.normalize_package_name(name)
-        if isinstance(version_mode, str):
-            self._version_mode = VersionChar(version_mode)
-        else:
-            self._version_mode: VersionChar | None = version_mode
-        self._version: str | None = version
-    
-    def lock(self, version_mode: VersionChar | str, version: str) -> PipPackage:
-        if isinstance(version_mode, str):
-            self._version_mode = VersionChar(version_mode)
-        else:
-            self._version_mode = version_mode
-        
-        self._version = version
-        return self
-    
-    @property
-    def as_dict(self) -> dict:
-        return {
-            "name": self._name,
-            "version_mode": self._version_mode,
-            "version": self._version
-        }
-    
-    @property
-    def name(self) -> str:
-        return self._name
-    @name.setter
-    def name(self, name: str):
-        self._name = self.normalize_package_name(name)
-
-    @property
-    def version_mode(self) -> VersionChar | None:
-        return self._version_mode
-    @version_mode.setter
-    def version_mode(self, version_mode: VersionChar | str):
-        if isinstance(version_mode, str):
-            self._version_mode = VersionChar(version_mode)
-        else:
-            self._version_mode = version_mode
-
-    @property
-    def version(self) -> str | None:
-        return self._version
-    @version.setter
-    def version(self, version: str | None):
-        self._version = version
-    
-    def create_requirement(self, delimiter: str = "") -> str:
-        text = [
-            f"{self._name}"
-        ]
-        if self._version_mode is not None and self._version is not None:
-            text.append(f"{self._version_mode.value}")
-            text.append(f"{self._version}")
-        return delimiter.join(text)
-    
-    @classmethod
-    def normalize_package_name(cls, name: str) -> str:
-        if not name or not isinstance(name, str):
-            raise ValueError("Package name must be a non-empty string")
-    
-        if not cls.PACKAGE_NAME_CHARSET.match(name):
-            raise ValueError(f"Package name {name} contains invalid characters")
-        
-        if name[0] in ["-", "_", "."] or name[-1] in ["-", "_", "."]:
-            raise ValueError(f"Package name {name} cannot start or end with a special character")
-        
-        if cls.CONSECUTIVE_SPECIAL_CHARACTERS.search(name):
-            raise ValueError(f"Package name {name} contains consecutive special characters")
-        
-        normalized = name.lower()
-        normalized = cls.SPECIAL_CHARACTER_REPLACEMENT.sub("_", normalized)
-        
-        return normalized
-    
-    def __str__(self) -> str:
-        return self.create_requirement()
-    
-    def __hash__(self) -> int:
-        return hash((self._name, self._version_mode, self._version))
-    
-    def __eq__(self, other: PipPackage) -> bool:
-        return (
-            self._name == other._name and
-            self._version_mode == other._version_mode and
-            self._version == other._version
-        )
-# endregion
-
-# region PipInstaller
-class PipInstaller:
-    def __init__(self, requirements: list[PipPackage | list[str] | tuple[str, str, str] | dict[str, str]] | None = None):
-        self._requirements: list[PipPackage] = []
-        for requirement in requirements or []:
-            if isinstance(requirement, PipPackage):
-                self._requirements.append(requirement)
-            elif isinstance(requirement, list | tuple):
-                self._requirements.append(PipPackage(*requirement))
-            elif isinstance(requirement, dict):
-                self._requirements.append(PipPackage(**requirement))
-    
-    def lock_requirement(self, requirement_name: str, version_mode: str, version: str) -> None:
-        for requirement in self._requirements:
-            if requirement.name == PipPackage.normalize_package_name(requirement_name):
-                requirement.lock(version_mode, version)
-                return
-        
-        raise ValueError(f"Requirement {requirement_name} not found")
-    
-    @property
-    def as_dict(self) -> list[dict[str, str]]:
-        return [requirement.as_dict for requirement in self._requirements]
-
-    def create_requirements(self, delimiter: str = " ") -> str:
-        return delimiter.join([requirement.create_requirement() for requirement in self._requirements])
-    
-    def create_requirements_file(self, path: str | Path, encoding: str = "utf-8", delimiter: str = "\n") -> None:
-        Path(path).parent.mkdir(parents = True, exist_ok = True)
-        with open(path, "w", encoding = encoding) as f:
-            f.write(self.create_requirements(delimiter))
-
-    def __contains__(self, name: str) -> bool:
-        name = PipPackage.normalize_package_name(name)
-        for requirement in self._requirements:
-            if requirement.name == name:
-                return True
-        return False
-    
-    def add_requirement(self, requirement: PipPackage) -> None:
-        self._requirements.append(requirement)
-    
-    def add_requirements(self, requirements: list[PipPackage]) -> None:
-        self._requirements.extend(requirements)
-    
-    def install(self, pip_path: str | Path = "pip"):
-        subprocess.run([str(pip_path), "install", self.create_requirements()])
 # endregion
 
 # region  Ask
@@ -714,7 +559,7 @@ class SlovesStarter:
         self.process_exit_title: str = self.title
         self.exit_title: str = self.title
         self.use_venv: bool = True
-        self.requirements: PipInstaller = PipInstaller()
+        self.requirements: list[str] = []
         self.requirements_file: CrossPlatformValue[str] = CrossPlatformValue(
             default="requirements.txt"
         )
@@ -876,10 +721,8 @@ class SlovesStarter:
         
         if exists_and_is_designated_type("requirements", list):
             data = config["requirements"]
-            try:
-                self.requirements = PipInstaller(requirements=data)
-            except Exception:
-                pass
+            if check_all_list_types(data, str):
+                self.requirements = data
         
         if exists_and_is_designated_type("requirements_file", dict):
             data = config["requirements_file"]
@@ -967,7 +810,7 @@ class SlovesStarter:
             "exit_title": self.exit_title,
             "python_name": self.python_name.dump(),
             "pip_name": self.pip_name.dump(),
-            "requirements": self.requirements.as_dict,
+            "requirements": self.requirements,
             "requirements_file": self.requirements_file.value,
             "cwd": str(self.cwd),
             "work_directory": str(self.work_directory),
@@ -1180,10 +1023,9 @@ class SlovesStarter:
                 ) is not None:
                 if not (self.work_directory / self.requirements_file.value).exists():
                     if self.ask(id = "Create requirements file", prompt="Create a requirements.txt file", default=True, askfile=askfile):
-                        self.requirements.create_requirements_file(
-                            path = self.work_directory / self.requirements_file.value,
-                            encoding=self.text_encoding
-                        )
+                        with open(self.work_directory / self.requirements_file.value, "w", encoding=self.text_encoding) as f:
+                            for package in self.requirements:
+                                f.write(f"{package}\n")
                 if (self.work_directory / self.requirements_file.value).exists():
                     if self.run_cmd(
                             [str(self.venv_bin_path / self.pip_name.value), "install", "-r", self.requirements_file.value],
