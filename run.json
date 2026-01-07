@@ -12,12 +12,12 @@
         "default": "pip3"
     },
     "requirements":[
-        {"name": "aiofiles"},
-        {"name": "loguru"},
-        {"name": "httpx"},
-        {"name": "pyyaml"},
-        {"name": "orjson"},
-        {"name": "pydantic"}
+        "aiofiles",
+        "loguru",
+        "httpx",
+        "pyyaml",
+        "orjson",
+        "pydantic"
     ],
     "use_venv": true,
     "venv_prompt": "Repeater Notes Plugins",
