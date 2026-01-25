@@ -58,7 +58,12 @@ class NoteCore:
                     ),
                     json = {
                         "message": self._prompt,
-                        "reference_context_id": reference_context_user_id,
+                        "cross_user_data_access": {
+                            "context": {
+                                "load_from_user_id": reference_context_user_id,
+                                "save_to_user_id": reference_context_user_id
+                            }
+                        },
                         "save_context": False,
                         "user_info": self._config.user_info.model_dump(exclude_none = True),
                     },
