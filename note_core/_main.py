@@ -58,10 +58,9 @@ class NoteCore:
                     ),
                     json = {
                         "message": self._prompt,
-                        "cross_user_data_access": {
+                        "cross_user_data_routing": {
                             "context": {
-                                "load_from_user_id": reference_context_user_id,
-                                "save_to_user_id": reference_context_user_id
+                                "load_from_user_id": reference_context_user_id
                             }
                         },
                         "save_context": False,
