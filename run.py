@@ -3,7 +3,7 @@ from __future__ import annotations
 # Python Simple Launcher For Virtual Environment Scripts
 # Sloves Starter !!!
 
-__version__ = "0.4.5"
+__version__ = "0.5.0"
 
 # region Imports
 import re
@@ -552,7 +552,8 @@ class SlovesStarter:
         )
         self.venv_prompt: str = "venv"
         self.script_name: str | list[str] | None = None
-        self.argument: list[str] | None = None
+        self.python_arguments: list[str] = []
+        self.arguments: list[str] | None = None
         self.title: str = "Sloves Python Script Starter"
         self.console_title: str = self.title
         self.process_title: str = "Python Script"
@@ -743,9 +744,13 @@ class SlovesStarter:
                 if check_all_list_types(data, str):
                     self.script_name = data
         
-        if exists_and_is_designated_type("argument", list):
-            if check_all_list_types(config["argument"], str):
-                self.argument = config["argument"]
+        if exists_and_is_designated_type("arguments", list):
+            if check_all_list_types(config["arguments"], str):
+                self.arguments = config["arguments"]
+        
+        if exists_and_is_designated_type("python_argument", list):
+            if check_all_list_types(config["python_argument"], str):
+                self.python_arguments = config["python_argument"]
         
         if exists_and_is_designated_type("use_venv", bool):
             self.use_venv = config["use_venv"]
@@ -817,7 +822,8 @@ class SlovesStarter:
             "use_venv": self.use_venv,
             "venv_prompt": self.venv_prompt,
             "script_name": self.script_name,
-            "argument": self.argument,
+            "arguments": self.arguments,
+            "python_arguments": self.python_arguments,
             "restart": self.restart,
             "reselect": self.reselect,
             "run_cmd_need_to_ask": self.run_cmd_need_to_ask,
@@ -924,7 +930,7 @@ class SlovesStarter:
             try:
                 if self.allow_print:
                     self.print_divider_line()
-                start = time.monotonic_ns()
+                start = time.perf_counter_ns()
                 result: subprocess.CompletedProcess[bytes] = subprocess.run(
                     cmd,
                     cwd = cwd,
@@ -950,7 +956,7 @@ class SlovesStarter:
                 askfile.flush()
                 raise
             finally:
-                end = time.monotonic_ns()
+                end = time.perf_counter_ns()
                 if print_runtime and callable(runtime_handler):
                     askfile.write(runtime_handler(start, end))
                     askfile.write("\n")
@@ -1096,17 +1102,17 @@ class SlovesStarter:
         
         if self.use_venv:
             if SYSTEM == "Windows":
-                start = [str(self.work_directory / ".venv" / "Scripts" / self.python_name.value), str(script_name)]
+                start = [str(self.work_directory / ".venv" / "Scripts" / self.python_name.value), *self.python_arguments, str(script_name)]
             else:
-                start = [str(self.work_directory / ".venv" / "bin" / self.python_name.value), str(script_name)]
+                start = [str(self.work_directory / ".venv" / "bin" / self.python_name.value), *self.python_arguments, str(script_name)]
         else:
-            start = [self.python_name.value, str(script_name)]
+            start = [self.python_name.value, *self.python_arguments, str(script_name)]
 
-        if self.argument:
-            start.extend(self.argument)
+        if self.arguments:
+            start.extend(self.arguments)
             if self.allow_print:
                 print("Use argument:")
-                print(shlex.join(self.argument))
+                print(shlex.join(self.arguments))
         else:
             if len(sys.argv) > 1:
                 argument = sys.argv[1:]
