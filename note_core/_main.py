@@ -64,8 +64,7 @@ class NoteCore:
                             }
                         },
                         "save_context": False,
-                        "user_info": self._config.user_info.model_dump(exclude_none = True),
-                        "allow_tool_calls": False
+                        "user_info": self._config.user_info.model_dump(exclude_none = True)
                     },
                     timeout = self._config.server.timeout,
                 )
